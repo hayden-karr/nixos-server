@@ -1,0 +1,42 @@
+# ApplicationSet - Automatically creates Applications for all k8s/* directories
+#
+# Update the repoURL's to your fork: git@github.com:YOUR_USERNAME/YOUR_REPO.git
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: k8s-apps
+  namespace: argocd
+spec:
+  generators:
+    - git:
+        repoURL: git@github.com:YOUR_USERNAME/YOUR_REPO.git
+        revision: main
+        directories:
+          - path: k8s/*
+          - path: k8s/argocd
+            exclude: true # Exclude argocd directory (contains meta-config)
+  template:
+    metadata:
+      name: "{{path.basename}}" # vault, monitoring, immich-friend, etc.
+    spec:
+      project: default
+      source:
+        repoURL: git@github.com:YOUR_USERNAME/YOUR_REPO.git
+        targetRevision: main
+        path: "{{path}}"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{path.basename}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - Replace=true # Auto-delete and recreate on changes (like Helm)
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m

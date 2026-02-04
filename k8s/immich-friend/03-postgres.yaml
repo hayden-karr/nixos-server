@@ -1,0 +1,122 @@
+# PostgreSQL Database - Immich photo storage backend
+# PRODUCTION DEPLOYMENT - Single node with multi-node migration path
+#
+# CURRENT: Single-node with hostPath storage
+# MULTI-NODE MIGRATION:
+#   1. Deploy network storage (NFS/Longhorn/Ceph)
+#   2. Create PersistentVolumeClaim (see storage comments below)
+#   3. Migrate data: pg_dump → new PVC → pg_restore
+#   4. Consider PostgreSQL HA (Patroni/Stolon) for true multi-node
+#   5. Update immich to use new postgres connection string
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: immich-friend
+  labels:
+    app: postgres
+    tier: database
+spec:
+  serviceName: postgres
+  # SINGLE NODE: 1 replica
+  # MULTI-NODE: PostgreSQL StatefulSet typically stays at 1 replica
+  # For HA, use Patroni/Stolon/CloudNativePG operators instead
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+      tier: database
+  template:
+    metadata:
+      labels:
+        app: postgres
+        tier: database
+    spec:
+      securityContext:
+        fsGroup: 999
+        runAsNonRoot: true
+
+      containers:
+        - name: postgres
+          image: ghcr.io/immich-app/postgres:16-vectorchord0.3.0-pgvectors0.3.0
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_USER
+              value: immich
+            - name: POSTGRES_DB
+              value: immich
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          securityContext:
+            runAsUser: 999
+            runAsGroup: 999
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "immich"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "immich"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+  # PersistentVolumeClaim template - proper Kubernetes storage
+  # Uses k3s local-path provisioner, automatically handles fsGroup ownership
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+        annotations:
+          # Use 'local' mount instead of 'hostPath' to support fsGroup
+          volumeType: local
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 50Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: immich-friend
+  labels:
+    app: postgres
+    tier: database
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app: postgres
+    tier: database
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres

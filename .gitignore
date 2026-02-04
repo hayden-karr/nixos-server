@@ -1,0 +1,21 @@
+# SOPS encrypted secrets - NEVER commit these files
+# They contain your encrypted passwords, API keys, and sensitive data
+# Only commit the .template files
+secrets.yaml
+.sops.yaml
+
+# Result symlinks from nix builds
+result
+result-*
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Local development files
+.envrc
+.direnv/

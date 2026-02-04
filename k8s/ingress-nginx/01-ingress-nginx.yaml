@@ -1,0 +1,345 @@
+# NGINX Ingress Controller
+# Official community version: https://kubernetes.github.io/ingress-nginx/
+#
+# PORT SEPARATION STRATEGY:
+# - Main nginx (services.nginx): Port 443 on VPN/LAN IPs for *.local domains
+# - Pi-hole: Port 8080 for web interface
+# - K3s nginx-ingress: Ports 8081/8444 on 0.0.0.0 for external domains
+# - Cloudflared: Routes to localhost:8081 (nginx-ingress HTTP port)
+#
+# This deploys the ingress controller with hostPort bindings:
+#   Container:80  → Host:8081  (HTTP for cloudflared)
+#   Container:443 → Host:8444  (HTTPS for direct access)
+#
+# MULTI-NODE CONSIDERATIONS:
+# - Single node: hostPort works perfectly for direct host access
+# - Multi-node: Replace hostPort with NodePort or LoadBalancer service
+#   (hostPort only binds on the node where the pod runs)
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ingress-nginx
+  namespace: ingress-nginx
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ingress-nginx
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - endpoints
+      - nodes
+      - pods
+      - secrets
+      - namespaces
+    verbs:
+      - list
+      - watch
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingresses/status
+    verbs:
+      - update
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingressclasses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - discovery.k8s.io
+    resources:
+      - endpointslices
+    verbs:
+      - list
+      - watch
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ingress-nginx
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ingress-nginx
+subjects:
+  - kind: ServiceAccount
+    name: ingress-nginx
+    namespace: ingress-nginx
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ingress-nginx
+  namespace: ingress-nginx
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - pods
+      - secrets
+      - endpoints
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingresses/status
+    verbs:
+      - update
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingressclasses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    resourceNames:
+      - ingress-nginx-leader
+    verbs:
+      - get
+      - update
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - create
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+  - apiGroups:
+      - discovery.k8s.io
+    resources:
+      - endpointslices
+    verbs:
+      - list
+      - watch
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ingress-nginx
+  namespace: ingress-nginx
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ingress-nginx
+subjects:
+  - kind: ServiceAccount
+    name: ingress-nginx
+    namespace: ingress-nginx
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+data:
+  allow-snippet-annotations: "true"
+  use-forwarded-headers: "true"
+  compute-full-forwarded-for: "true"
+  use-proxy-protocol: "false"
+  forwarded-for-header: "X-Forwarded-For"
+
+  # Bot protection - block common exploit paths at ingress level
+  # Returns 403 for suspicious bot scan paths before reaching backend
+  http-snippet: |
+    map $request_uri $is_blocked_bot_path {
+      default 0;
+      # Version control and sensitive files
+      "~*\.(git|svn|env|htaccess|htpasswd)$" 1;
+      "~*/\.(git|svn|env|htaccess|htpasswd)" 1;
+      # Common CMS admin panels
+      "~*/wp-admin" 1;
+      "~*/wp-login" 1;
+      "~*/xmlrpc\.php" 1;
+      # Database admin tools
+      "~*/phpMyAdmin" 1;
+      "~*/phpmyadmin" 1;
+      "~*/pma" 1;
+      "~*/adminer" 1;
+      # Generic admin paths (but not API endpoints containing 'admin')
+      "~*/admin$" 1;
+      "~*/admin/" 1;
+      "~*/administrator$" 1;
+      "~*/administrator/" 1;
+      # Config and backup files
+      "~*/config\.php" 1;
+      "~*/configuration\.php" 1;
+      "~*/database\.sql" 1;
+      "~*/db\.sql" 1;
+      "~*/backup" 1;
+      "~*/\.backup" 1;
+      # Well-known PHP injection attempts
+      "~*/\.well-known/.*\.php" 1;
+    }
+
+  server-snippet: |
+    # Block requests to suspicious paths
+    if ($is_blocked_bot_path = 1) {
+      return 403;
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+  labels:
+    app: ingress-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ingress-nginx
+  template:
+    metadata:
+      labels:
+        app: ingress-nginx
+    spec:
+      serviceAccountName: ingress-nginx
+      containers:
+      - name: controller
+        image: registry.k8s.io/ingress-nginx/controller:v1.11.1
+        args:
+          - /nginx-ingress-controller
+          - --election-id=ingress-nginx-leader
+          - --controller-class=k8s.io/ingress-nginx
+          - --ingress-class=nginx
+          - --configmap=$(POD_NAMESPACE)/ingress-nginx-controller
+          - --watch-ingress-without-class=true
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: LD_PRELOAD
+            value: /usr/local/lib/libmimalloc.so
+        ports:
+          - name: http
+            containerPort: 80
+            protocol: TCP
+          - name: https
+            containerPort: 443
+            protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 10254
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 1
+          successThreshold: 1
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 10254
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 1
+          successThreshold: 1
+          failureThreshold: 3
+        securityContext:
+          capabilities:
+            drop:
+              - ALL
+            add:
+              - NET_BIND_SERVICE
+          runAsUser: 101
+          allowPrivilegeEscalation: false
+---
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: nginx
+  labels:
+    app: ingress-nginx
+spec:
+  controller: k8s.io/ingress-nginx

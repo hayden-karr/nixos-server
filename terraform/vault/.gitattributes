@@ -1,0 +1,3 @@
+# Ensure tfstate files are never accidentally committed
+*.tfstate filter=secret
+*.tfstate.* filter=secret

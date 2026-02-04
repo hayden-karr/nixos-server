@@ -1,0 +1,76 @@
+# Redis Cache - Immich job queue and caching
+# PRODUCTION DEPLOYMENT - Single node with multi-node migration path
+#
+# CURRENT: Single-node ephemeral (no persistence)
+# MULTI-NODE MIGRATION:
+#   1. Deploy Redis Sentinel (1 master + 2 replicas) for HA
+#   2. OR use Redis Cluster (3-6 nodes) for sharding
+#   3. Enable RDB/AOF persistence with PVC
+#   4. Update immich REDIS_HOSTNAME to use Sentinel/Cluster endpoints
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: immich-friend
+  labels:
+    app: redis
+    tier: cache
+spec:
+  # SINGLE NODE: 1 replica (ephemeral)
+  # MULTI-NODE: Deploy Redis Sentinel/Cluster instead
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+      tier: cache
+  template:
+    metadata:
+      labels:
+        app: redis
+        tier: cache
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
+      containers:
+        - name: redis
+          image: redis:alpine
+          ports:
+            - containerPort: 6379
+              name: redis
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: immich-friend
+spec:
+  selector:
+    app: redis
+    tier: cache
+  ports:
+    - port: 6379
+      targetPort: 6379
+      name: redis
+  type: ClusterIP

@@ -1,0 +1,55 @@
+# PostgreSQL Backup CronJob
+# Runs daily backup of Immich database to prevent data loss
+# Backups stored in /usr/src/app/upload/backups (shared with Immich)
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: immich-friend
+spec:
+  # Run at 2 AM every day
+  schedule: "0 2 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backup
+              image: ghcr.io/immich-app/postgres:16-vectorchord0.3.0-pgvectors0.3.0
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  BACKUP_FILE="/backups/immich-backup-$(date +%Y%m%d-%H%M%S).sql.gz"
+                  echo "Creating backup: $BACKUP_FILE"
+                  pg_dump -h postgres -U immich immich | gzip > "$BACKUP_FILE"
+                  echo "Backup completed successfully"
+
+                  # Keep only last 7 days of backups
+                  find /backups -name "immich-backup-*.sql.gz" -mtime +7 -delete
+                  echo "Old backups cleaned up"
+
+                  ls -lh /backups/
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: postgres-credentials
+                      key: password
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /backups
+          volumes:
+            - name: backup-storage
+              hostPath:
+                path: /mnt/storage/immich_friend/k3s/backups
+                type: DirectoryOrCreate
+---
+# Note: Backups stored in /mnt/storage/immich_friend/k3s/backups (HDD storage)
+# To restore manually:
+#   gunzip < backup.sql.gz | kubectl exec -i -n immich-friend postgres-0 -- psql -U immich immich

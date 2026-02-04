@@ -1,0 +1,59 @@
+# REFERENCE ONLY - This Ingress is now managed by Terraform
+# The actual Ingress resource is created in terraform/vault/main.tf
+# Domains are set in terraform/vault/terraform.tfvars (SSOT)
+#
+# This file is kept for reference to show the structure
+# DO NOT uncomment - it will conflict with Terraform-managed resource
+
+# # Ingress resources for Immich Friend
+# # Routes traffic from nginx ingress controller to services
+# # Cloudflared points to localhost:8081 (nginx ingress)
+# #
+# # IMPORTANT: Replace the placeholder domains below with your actual domains:
+# #   - IMMICH_DOMAIN_PLACEHOLDER -> your Immich domain (e.g., photos.example.com)
+# #   - AUTHELIA_DOMAIN_PLACEHOLDER -> your Authelia domain (e.g., auth.example.com)
+# #
+# # These must match the domains you set in terraform/vault/terraform.tfvars
+#
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: immich-friend-ingress
+#   namespace: immich-friend
+#   annotations:
+#     nginx.ingress.kubernetes.io/proxy-body-size: "0"
+#     nginx.ingress.kubernetes.io/proxy-buffering: "off"
+#     nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+#     nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+#     nginx.ingress.kubernetes.io/configuration-snippet: |
+#       proxy_set_header X-Forwarded-Proto https;
+#       proxy_set_header X-Forwarded-Host $http_host;
+#       proxy_set_header X-Forwarded-URI $request_uri;
+#       proxy_set_header X-Forwarded-For $remote_addr;
+#       proxy_set_header X-Original-URL https://$http_host$request_uri;
+# spec:
+#   ingressClassName: nginx
+#   rules:
+#     # Immich
+#     - host: IMMICH_DOMAIN_PLACEHOLDER
+#       http:
+#         paths:
+#           - path: /
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: immich
+#                 port:
+#                   number: 2283
+#
+#     # Authelia
+#     - host: AUTHELIA_DOMAIN_PLACEHOLDER
+#       http:
+#         paths:
+#           - path: /
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: authelia
+#                 port:
+#                   number: 9091

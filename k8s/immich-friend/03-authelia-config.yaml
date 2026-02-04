@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authelia-config
+  namespace: immich-friend
+data:
+  configuration.yml: |
+    theme: auto
+    default_2fa_method: webauthn
+
+    server:
+      address: 'tcp://0.0.0.0:9091/'
+
+    log:
+      level: info
+
+    identity_validation:
+      reset_password: {}
+
+    totp:
+      issuer: BASE_DOMAIN_PLACEHOLDER
+
+    webauthn:
+      disable: false
+      display_name: Authelia
+      timeout: 60s
+
+    authentication_backend:
+      file:
+        path: /data/users_database.yml
+
+    access_control:
+      default_policy: two_factor
+      rules: []
+
+    regulation:
+      max_retries: 5
+      find_time: 10m
+      ban_time: 3h
+
+    session:
+      cookies:
+        - domain: BASE_DOMAIN_PLACEHOLDER
+          authelia_url: https://AUTHELIA_DOMAIN_PLACEHOLDER
+
+    storage:
+      local:
+        path: /data/db.sqlite3
+
+    notifier:
+      disable_startup_check: true
+      filesystem:
+        filename: /data/notification.txt
+
+    identity_providers:
+      oidc:
+        jwks:
+          - key_id: 'immich-friend-rsa'
+            algorithm: 'RS256'
+            use: 'sig'
+            key: {{ secret "/data/oidc_rsa.pem" | mindent 10 "|" | msquote }}
+        clients:
+          - client_id: immich-friend
+            client_name: Immich Friend
+            client_secret: 'OAUTH_CLIENT_SECRET_HASHED_PLACEHOLDER'
+            public: false
+            authorization_policy: two_factor
+            token_endpoint_auth_method: client_secret_post
+            redirect_uris:
+              - https://IMMICH_DOMAIN_PLACEHOLDER/auth/login
+              - https://IMMICH_DOMAIN_PLACEHOLDER/user-settings
+              - https://IMMICH_DOMAIN_PLACEHOLDER/api/oauth/mobile-redirect
+              - app.immich:///oauth-callback
+            scopes:
+              - openid
+              - profile
+              - email
+            grant_types:
+              - authorization_code
+            response_types:
+              - code
