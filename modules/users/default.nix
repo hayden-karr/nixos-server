@@ -1,7 +1,1 @@
-{
-  imports = [
-    ./admin
-    ./immich-friend
-    ./minecraft
-  ];
-}
+{ imports = [ ./admin ./minecraft ]; }

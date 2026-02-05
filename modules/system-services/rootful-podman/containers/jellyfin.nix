@@ -1,4 +1,7 @@
-_: {
+{ config, ... }:
+
+let inherit (config.serverConfig.network) localhost;
+in {
   # Jellyfin - Media server for movies, TV shows, music
   # VPN-only access for privacy
   # Access: https://jellyfin.local (via WireGuard)
@@ -13,8 +16,7 @@ _: {
     image = "jellyfin/jellyfin:latest";
     autoStart = true;
 
-    # Port mapping for better isolation (not host network)
-    ports = [ "8096:8096" ];
+    ports = [ "${localhost.ip}:8096:8096" ];
 
     # Enable NVIDIA GPU for hardware transcoding
     extraOptions = [

@@ -10,15 +10,14 @@ let
     inherit (config) serverConfig;
   };
   inherit (config.serverConfig.network.server) localIp;
-
+  inherit (config.serverConfig.network) localhost;
 in {
 
   virtualisation.oci-containers.containers.memos = {
     image = "neosmemo/memos:latest";
     autoStart = true;
 
-    # Port mapping for better isolation
-    ports = [ "5230:5230" ];
+    ports = [ "${localhost.ip}:5230:5230" ];
 
     volumes = [
       "/mnt/ssd/memos:/var/opt/memos:U"
@@ -64,7 +63,7 @@ in {
       # Build DSN environment file
       source /run/vault/memos/db-creds
       cat > /run/secrets/memos/memos-env <<EOF
-      MEMOS_DSN=postgresql://$USERNAME:$PASSWORD@${localIp}:5432/memos?sslmode=disable
+      MEMOS_DSN=postgresql://$USERNAME:$PASSWORD@${localIp}:5432/memos_homelab?sslmode=disable
       EOF
     '';
   };
@@ -85,7 +84,6 @@ in {
   #
   # 3. Add memos.local DNS record to Pi-hole:
   #    Edit modules/containers/pihole.nix line 66:
-  #    FTLCONF_dns_hosts = "...;192.168.4.105 memos.local";
   #
   # 4. Add nginx reverse proxy for memos.local:
   #

@@ -2,11 +2,10 @@
 # All container secrets and Vault configurations defined here
 # Takes serverConfig as a parameter to access network configuration
 serverConfig:
-
 let
   inherit (serverConfig.network) localhost;
-in
-{
+  inherit (serverConfig.network.server) vpnIp;
+in {
   # Global Vault configuration
   vaultAddr = "http://${localhost.ip}:8200";
 
@@ -15,9 +14,16 @@ in
     host = serverConfig.network.server.localIp;
     port = 5432;
     adminUser = "vault_admin";
-    # Databases to create
-    databases =
-      [ "gitea" "forgejo" "immich" "vaultwarden" "n8n" "memos" "linkwarden" ];
+    # Databases with _homelab suffix for safe branch switching
+    databases = [
+      "gitea_homelab"
+      "forgejo_homelab"
+      "immich_homelab"
+      "vaultwarden_homelab"
+      "n8n_homelab"
+      "memos_homelab"
+      "linkwarden_homelab"
+    ];
   };
 
   # AppRole token configuration (applies to all containers)
@@ -25,8 +31,7 @@ in
     tokenTtl = "1h";
     tokenMaxTtl = "4h";
     secretIdBoundCidrs = "${localhost.ip}/32,10.88.0.0/16";
-    tokenBoundCidrs =
-      "${localhost.ip}/32,${serverConfig.network.server.vpnIp}/32,10.88.0.0/16";
+    tokenBoundCidrs = "${localhost.ip}/32,${vpnIp}/32,10.88.0.0/16";
   };
 
   # Container secret definitions
@@ -41,7 +46,7 @@ in
     # Photo management and sharing
     immich = {
       dynamicDb = {
-        database = "immich";
+        database = "immich_homelab";
         ttl = "24h";
         maxTtl = "72h";
       };
@@ -54,7 +59,7 @@ in
     # Password manager (Bitwarden-compatible)
     vaultwarden = {
       dynamicDb = {
-        database = "vaultwarden";
+        database = "vaultwarden_homelab";
         ttl = "24h";
         maxTtl = "72h";
       };
@@ -71,7 +76,7 @@ in
     # Self-hosted Git service (alternative to Forgejo)
     gitea = {
       dynamicDb = {
-        database = "gitea";
+        database = "gitea_homelab";
         ttl = "24h";
         maxTtl = "72h";
       };
@@ -84,7 +89,7 @@ in
     # Self-hosted Git service (default, community-driven)
     forgejo = {
       dynamicDb = {
-        database = "forgejo";
+        database = "forgejo_homelab";
         ttl = "24h";
         maxTtl = "72h";
       };
@@ -97,7 +102,7 @@ in
     # Workflow automation
     n8n = {
       dynamicDb = {
-        database = "n8n";
+        database = "n8n_homelab";
         ttl = "24h";
         maxTtl = "72h";
       };
@@ -114,7 +119,7 @@ in
     # Note-taking
     memos = {
       dynamicDb = {
-        database = "memos";
+        database = "memos_homelab";
         ttl = "24h";
         maxTtl = "72h";
       };
@@ -127,7 +132,7 @@ in
     # Link/bookmark management
     linkwarden = {
       dynamicDb = {
-        database = "linkwarden";
+        database = "linkwarden_homelab";
         ttl = "24h";
         maxTtl = "72h";
       };
@@ -190,20 +195,7 @@ in
       }];
       outputFormat = "separate";
       user = "root";
-      group = "smtp";
-    };
-
-    # Email API key (shared for SMTP and alerts)
-    resend = {
-      dynamicDb = null;
-      kvSecrets = [{
-        path = "resend/api";
-        field = "key";
-        fileName = "resend-api-key";
-      }];
-      outputFormat = "separate";
-      user = "root";
-      group = "smtp";
+      group = "discord";
     };
 
     # === Rootless containers (user-owned) ===
@@ -233,45 +225,5 @@ in
     #   user = "minecraft";
     #   group = "minecraft";
     # };
-
-    # Immich with OAuth authentication (Authelia)
-    immich-friend = {
-      dynamicDb = null;
-      kvSecrets = [
-        {
-          path = "immich-friend/oauth";
-          field = "client_secret";
-          fileName = "oauth-client-secret";
-        }
-        {
-          path = "immich-friend/jwt";
-          field = "secret";
-          fileName = "jwt-secret";
-        }
-        {
-          path = "immich-friend/session";
-          field = "secret";
-          fileName = "session-secret";
-        }
-        {
-          path = "immich-friend/storage";
-          field = "key";
-          fileName = "storage-key";
-        }
-        {
-          path = "immich-friend/oidc-hmac";
-          field = "secret";
-          fileName = "oidc-hmac-secret";
-        }
-        {
-          path = "immich-friend/database";
-          field = "password";
-          fileName = "db-password";
-        }
-      ];
-      outputFormat = "separate";
-      user = "immich-friend";
-      group = "immich-friend";
-    };
   };
 }

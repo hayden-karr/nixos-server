@@ -10,6 +10,7 @@ let
   };
   vaultExtractDbCreds = vaultLib.mkVaultExtractDbCreds pkgs;
   inherit (config.serverConfig.network.server) localIp;
+  inherit (config.serverConfig.network) localhost;
 
   # Immich declarative configuration - YAML format
   # Reference: https://docs.immich.app/install/config-file/
@@ -198,7 +199,7 @@ in {
 
         # Immich Machine Learning - GPU accelerated
         immich-ml = {
-          image = "ghcr.io/immich-app/immich-machine-learning:release";
+          image = "ghcr.io/immich-app/immich-machine-learning:v2.4.1";
           autoStart = true;
           extraOptions = [
             "--network=immich"
@@ -221,11 +222,10 @@ in {
 
         # Immich Server
         immich = {
-          image = "ghcr.io/immich-app/immich-server:release";
+          image = "ghcr.io/immich-app/immich-server:v2.4.1";
           autoStart = true;
 
-          # Port mapping for better isolation
-          ports = [ "2283:2283" ];
+          ports = [ "${localhost.ip}:2283:2283" ];
 
           # Connect to immich network + allow access to host PostgreSQL
           extraOptions = [
@@ -261,18 +261,10 @@ in {
             DB_HOSTNAME = localIp;
             DB_PORT = "5432";
             DB_USERNAME_FILE = "/run/secrets/db_username";
-            DB_DATABASE_NAME = "immich";
+            DB_DATABASE_NAME = "immich_homelab";
             DB_PASSWORD_FILE = "/run/secrets/db_password";
 
-            # Redis connection - hardcoded IP due to DNS issues
-            # TODO: Container name resolution (immich-redis) times out despite:
-            #   - aardvark-dns running (confirmed via ps aux)
-            #   - dns_enabled: true on network
-            #   - Both containers on same network (10.89.0.0/24)
-            #   - getent hosts immich-redis hangs indefinitely
-            # This worked previously with hostname, unclear what changed
-            # Investigate: podman version changes, DNS config, systemd-resolved conflict
-            # Change immich-redis to 10.89.0.0/24 and it works -> further testing needed
+            # Redis connection via container name (same network)
             REDIS_HOSTNAME = "immich-redis";
             REDIS_PORT = "6379";
 
@@ -354,9 +346,8 @@ in {
 
         serviceConfig = {
           RestartSec = "5s";
-          ExecStartPre = [
-            "${vaultExtractDbCreds}/bin/vault-extract-db-creds immich /run/secrets/immich"
-          ];
+          ExecStartPre =
+            "${vaultExtractDbCreds}/bin/vault-extract-db-creds immich /run/secrets/immich";
         };
       };
     };

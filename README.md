@@ -1,8 +1,8 @@
-# NixOS Server Configuration
+# NixOS Homelab Configuration
 
 Self-hosted services with VPN access, monitoring, and AI capabilities.
 
-**Status**: Active development. Core infrastructure (containerization, secrets management, monitoring, GitOps) is stable and operational. Adding new services and improvements as needed.
+**Status**: Active development. Core infrastructure (containerization, secrets management, monitoring) is stable and operational. Adding new services and improvements as needed.
 
 ## Required Configuration Changes
 
@@ -36,7 +36,6 @@ This is your single source of truth. Update:
 
 **User Settings:**
 
-- `user.email` - Your email (used for alerts, Let's Encrypt, Git)
 - `user.gitName` - Your Git commit name
 - `ssh.authorizedKeys` - Your SSH public keys (REQUIRED for access)
 
@@ -69,51 +68,32 @@ ip addr show | grep "inet " | grep -v 127.0.0.1
 - `network.server.vpnIp` - VPN IP for server (default: `10.0.0.1`)
 - `network.server.vpnNetwork` - VPN subnet (default: `10.0.0.0/24`)
 
-**Domain Settings (Optional):**
+**WireGuard VPN (Optional):**
 
-- `ingress.baseDomain` - Your domain for Let's Encrypt certs (default: `example.com`)
-  - Leave as `example.com` to use self-signed certs
-  - Set to your real domain (e.g., `yourdomain.com`) for Let's Encrypt
-- `mail.from` - From address for system emails (e.g., `noreply@yourdomain.com`)
+- `network.wireguard.enable` - Toggle VPN on/off (default: `true`)
+- When enabled, set `domain-vpn` in secrets.yaml to your IP:port
+  - LAN testing: `YOUR_LOCAL_IP:51820`
+  - Remote access: `YOUR_PUBLIC_IP:51820` (requires port forwarding)
 
-**Note:** Let's Encrypt config is untested. Use self-signed certificates (the default).
+**Nginx Configuration:**
+
+- `nginx.mode` - Choose reverse proxy mode:
+  - `"ip-ports"` - Access via server IP with different ports (no DNS setup needed)
+    - Example: `https://192.168.1.100:2283`, `https://192.168.1.100:8222`
+    - Works immediately, just accept browser warnings for self-signed certs
+  - `"domain-names"` - Access via friendly .local domains on port 443
+    - Example: `https://immich.local`, `https://vault.local`
+    - Requires Pi-hole DNS (configure router DHCP or per-device)
+    - Also uses self-signed certs (same browser warnings)
+
+Both modes use HTTPS with self-signed certificates. Trust the cert or accept browser warnings.
 
 **Monitoring Alerts:**
 
-- `monitoring.alerts.discord` - Enable Discord alerts (default: `true`)
-- `monitoring.alerts.email` - Enable email alerts via SMTP (default: `true`)
-- Can enable both, one, or the other based on your preference
-- Requires corresponding secrets in Vault (discord-webhook-url and/or resend-api-key)
+- Discord webhook alerts enabled
+- Requires `discord-webhook-url` in Vault secrets
 
-**Container Backend:**
-
-- `container-backend.backend` - `"podman"` or `"k3s"`
-
-### 3. K3s Configuration (If Using K3s)
-
-**File:** `config.nix` (gitops section)
-
-**For GitHub (Recommended):**
-
-- `container-backend.k3s.gitops.gitProvider` - Set to `"github"`
-- `container-backend.k3s.gitops.github.repoURL` - Your repo SSH URL
-  - Example: `git@github.com:yourusername/your-repo.git`
-- `container-backend.k3s.gitops.sshKeyPath` - Path to deploy key
-  - Example: `/var/lib/immich-friend/.ssh/argocd-deploy-key`
-
-**For Gitea (Self-hosted):**
-
-- `container-backend.k3s.gitops.gitProvider` - Set to `"gitea"`
-- `container-backend.k3s.gitops.gitea.repoURL` - External Gitea URL
-- `container-backend.k3s.gitops.gitea.internalURL` - Internal k3s URL
-  - Use `http://host.k3s.internal:3000/username/repo`
-
-**K3s Manifests (k8s/ directory):**
-
-- `k8s/immich-friend/01-secret-store.yaml` - Update Vault service URL if needed
-- All domain references in ingress files (if using custom domains)
-
-### 4. SOPS Secrets
+### 3. SOPS Secrets
 
 **File:** `secrets.yaml`
 
@@ -129,17 +109,13 @@ Add your age public key to `.sops.yaml`, then create `secrets.yaml` with:
 
 **Required Secrets:**
 
-- `wireguard-private-key` - Generate: `wg genkey`
-- `domain-vpn` - Your VPN domain (e.g., `vpn.yourdomain.com`)
-
-**Optional Secrets:**
-
-- `cloudflare-api-token` - Let's Encrypt DNS challenge
-- `domain-*` - Service domain names
+- `wireguard-private-key` - Generate: `wg genkey` (if VPN enabled)
+- `domain-vpn` - Your server IP and port (e.g., `192.168.1.100:51820` or `YOUR_PUBLIC_IP:51820`)
 - `vault-root-token` - Set after Vault init
 - `vault-recovery-keys` - Set after Vault init
+- `discord-webhook-url` - For monitoring alerts
 
-### 5. Storage Configuration (If Using HDD Pool)
+### 4. Storage Configuration (If Using HDD Pool)
 
 **File:** `modules/storage/hdd-pool.nix`
 
@@ -169,7 +145,7 @@ mount /dev/disk/by-uuid/YOUR-UUID-HERE /mnt/test
 
 - SSH keys in `config.nix` are the only way in. Password auth is disabled.
 - Back up your SOPS age key (`~/.config/sops/age/keys.txt`).
-- K3s manifests are safe to publish - secrets live in Vault/SOPS, not git.
+- All secrets are encrypted with SOPS or stored in Vault - safe to commit configuration to git.
 
 `<SERVER_IP>` = your server's LAN IP from `config.nix`
 
@@ -206,18 +182,13 @@ journalctl -u <service-name> -f
 
 ## Documentation
 
-### Kubernetes (k3s)
+Additional documentation for specific components:
 
-- **[k8s/README.md](k8s/README.md)** - kubectl setup, common commands, troubleshooting
-- [k8s/argocd/README.md](k8s/argocd/README.md) - GitOps deployment with ArgoCD
-- [k8s/vault/README.md](k8s/vault/README.md) - Vault deployment in k8s
-- [k8s/immich-friend/README.md](k8s/immich-friend/README.md) - Immich with OAuth authentication
+- Service configuration details in respective module files
+- Vault setup and policy management scripts in `modules/system-services/vault/`
+- Monitoring configuration in `modules/system-services/monitoring/`
 
-### Infrastructure as Code
-
-- **[terraform/vault/README.md](terraform/vault/README.md)** - Terraform/OpenTofu setup, domain management, secrets generation
-
-**Secrets**: Vault (Terraform) → ExternalSecrets Operator (k8s) → Apps
+**Secrets Management**: SOPS (encrypted in git) → Vault (runtime) → Containers
 
 ---
 
@@ -271,9 +242,23 @@ Untested. Shares `/mnt/storage` and `/mnt/ssd` via SMB/CIFS.
 
 ### Access Methods
 
-1. **Domains via nginx**: `https://jellyfin.local` (needs DNS config, HTTPS)
-2. **Direct IP:port**: `http://<SERVER_IP>:8096` (works immediately, HTTP)
-3. **VPN + domains**: `https://jellyfin.local` (via WireGuard, secure remote)
+Configured in `config.nix` via `nginx.mode`:
+
+1. **IP with ports** (`nginx.mode = "ip-ports"`):
+   - Access: `https://<SERVER_IP>:2283`, `https://<SERVER_IP>:8222`, etc.
+   - No DNS setup needed - works immediately
+   - Each service gets its own port
+   - Self-signed HTTPS certs (accept browser warnings or trust cert)
+
+2. **Domain names** (`nginx.mode = "domain-names"`):
+   - Access: `https://immich.local`, `https://vault.local`, etc.
+   - Requires Pi-hole DNS (router DHCP or per-device configuration)
+   - All services on port 443 with friendly domain names
+   - Self-signed HTTPS certs (same as ip-ports mode)
+
+Both modes use HTTPS with self-signed certificates. Choose ip-ports for simplicity or domain-names for convenience.
+
+**VPN access**: Works with either nginx mode when WireGuard is enabled
 
 ### VPN Setup
 
@@ -346,30 +331,37 @@ Only forward what you need. VPN gives you everything without exposing ports.
 
 Services are accessible on LAN at `<SERVER_IP>`.
 
-**Method 1: Direct IP:port** (works immediately)
+**Mode 1: IP with Ports** (`nginx.mode = "ip-ports"`):
 
 ```
-http://<SERVER_IP>:8096  # Jellyfin
-http://<SERVER_IP>:3000  # Gitea
-http://<SERVER_IP>:2283  # Immich
-http://<SERVER_IP>:9000  # Portainer
-http://<SERVER_IP>:5678  # n8n
-http://<SERVER_IP>:8088  # Open WebUI
+https://<SERVER_IP>:2283  # Immich
+https://<SERVER_IP>:8222  # Vaultwarden
+https://<SERVER_IP>:9000  # Portainer
+https://<SERVER_IP>:3000  # Gitea/Forgejo
+https://<SERVER_IP>:8096  # Jellyfin
+https://<SERVER_IP>:5678  # n8n
+https://<SERVER_IP>:8088  # Open WebUI
 ```
 
-**Method 2: Domain names** (requires DNS configuration)
+No DNS setup needed. Self-signed HTTPS certs (accept browser warnings).
+
+**Mode 2: Domain Names** (`nginx.mode = "domain-names"`):
 
 ```
-https://jellyfin.local
-https://gitea.local
 https://immich.local
+https://vault.local
 https://portainer.local
+https://gitea.local (or forgejo.local)
+https://jellyfin.local
+https://n8n.local
 https://ai.local
 ```
 
-See [DNS Configuration](#dns-configuration) below.
+Requires DNS configuration (see below). Self-signed HTTPS certs (same warnings).
 
 ### DNS Configuration
+
+**Only required for `nginx.mode = "domain-names"`**
 
 To use `.local` domain names, configure DNS resolution:
 
@@ -437,9 +429,14 @@ VPN-only: vault, hashi-vault, monitoring
 
 ### SSL Certificates
 
-Nginx uses self-signed certificates for `.local` domains. Browsers will show warnings.
+Both nginx modes use self-signed certificates. Browsers will show security warnings.
 
-**Trust the certificate** (optional):
+**Options:**
+
+1. Accept the browser warning each time (easiest)
+2. Trust the certificate once on each device (removes warnings)
+
+**To trust the certificate** (optional):
 
 ```bash
 # Download from server
@@ -721,8 +718,6 @@ Server uses `127.0.0.1` everywhere instead of `localhost`. Why? Testing showed `
 
 All Nix files use `${localhost.ip}` from `config.nix`. Don't change it.
 
-K3s uses `https://127.0.0.1:6443`. For remote access, use SSH tunnel (see k8s/README.md).
-
 ---
 
 ## Maintenance
@@ -890,7 +885,7 @@ Server stores username:hash. Clients use username:plaintext in URL. Server hashe
 
 ### Monitoring
 
-Access Grafana at `https://monitoring.local` (VPN). Dashboards for system metrics, containers, service health, and alerts. Alert destinations configured in `config.nix` (Discord, email, or both).
+Access Grafana at `https://monitoring.local` (VPN) or `https://<SERVER_IP>:3030`. Dashboards for system metrics, containers, service health, and alerts. Alerts sent via Discord webhook (configure in Vault).
 
 ### Logs
 
@@ -915,9 +910,9 @@ journalctl --since "1 hour ago"
 
 Check if running:
 
-   ```bash
-   systemctl status podman-<service-name>
-   ```
+```bash
+systemctl status podman-<service-name>
+```
 
 2. Verify port is listening:
 
@@ -1072,9 +1067,8 @@ Note: `imf` is an alias for `doas machinectl shell immich-friend@`
 ## Additional Resources
 
 - [NixOS Manual](https://nixos.org/manual/nixos/stable/)
-- [Kubernetes Documentation](https://kubernetes.io/docs/)
-- [OpenTofu Documentation](https://opentofu.org/docs/)
-- [ArgoCD Documentation](https://argo-cd.readthedocs.io/)
+- [Podman Documentation](https://docs.podman.io/)
 - [WireGuard Documentation](https://www.wireguard.com/quickstart/)
 - [Pi-hole Documentation](https://docs.pi-hole.net/)
 - [Vault Documentation](https://developer.hashicorp.com/vault/docs)
+- [SOPS Documentation](https://github.com/mozilla/sops)

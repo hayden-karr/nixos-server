@@ -9,7 +9,7 @@ let
     inherit (config) serverConfig;
   };
   inherit (config.serverConfig.network.server) localIp;
-
+  inherit (config.serverConfig.network) localhost;
 in {
 
   # Linkwarden container
@@ -17,8 +17,7 @@ in {
     image = "ghcr.io/linkwarden/linkwarden:latest";
     autoStart = true;
 
-    # Port mapping for better isolation
-    ports = [ "3500:3000" ];
+    ports = [ "${localhost.ip}:3500:3000" ];
 
     volumes = [
       # Data directory (screenshots, archives)
@@ -77,8 +76,9 @@ in {
       # Extract and combine with NEXTAUTH_SECRET
       source /run/vault/linkwarden/db-creds
       source /run/vault/linkwarden/nextauth-secret
+
       cat > /run/secrets/linkwarden/linkwarden-env <<EOF
-      DATABASE_URL=postgresql://$USERNAME:$PASSWORD@${localIp}:5432/linkwarden
+      DATABASE_URL=postgresql://$USERNAME:$PASSWORD@${localIp}:5432/linkwarden_homelab
       NEXTAUTH_SECRET=$NEXTAUTH_SECRET
       EOF
     '';

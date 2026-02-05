@@ -88,7 +88,7 @@
       sandbox = true;
 
       # Allow nix commands for wheel group + container system users (needed for home-manager)
-      allowed-users = [ "@wheel" "minecraft" "immich-friend" ];
+      allowed-users = [ "@wheel" "minecraft" ];
     };
 
     # Automatic garbage collection - removes old system generations
@@ -125,10 +125,7 @@
       logs = "journalctl -f";
       container-logs = "podman logs -f";
 
-      imf = "doas machinectl shell immich-friend@ /usr/bin/env";
       mc = "doas machinectl shell minecraft@ /usr/bin/env";
-
-      k = "doas kubectl --kubeconfig=/var/lib/immich-friend/k3s/k3s.yaml";
     };
   };
 
@@ -141,15 +138,7 @@
       ../../secrets.yaml; # Path from modules/system/ to repo root
     age.keyFile = "/var/lib/sops-nix/key.txt";
 
-    secrets = {
-      "user-password".neededForUsers = true;
-
-      # Decrypt domain at runtime
-      "domain" = {
-        owner = "root";
-        mode = "0444";
-      };
-    };
+    secrets = { "user-password".neededForUsers = true; };
   };
 
   system.stateVersion = "25.05";

@@ -1,8 +1,0 @@
-# Reloader Namespace - Dedicated namespace for Reloader operator
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: reloader
-  labels:
-    name: reloader
-    purpose: config-reload-automation

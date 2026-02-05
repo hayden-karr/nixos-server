@@ -3,12 +3,12 @@
 let
   inherit (config.serverConfig.network.server) vpnIp localIp;
   inherit (config.serverConfig.network) localhost;
-  selfSignedMode = config.serverConfig.ingress.certMode == "self-signed";
-in lib.mkIf selfSignedMode {
+  wireguardEnabled = config.serverConfig.network.wireguard.enable;
+in {
   # Nginx - Reverse proxy for friendly local domain names with HTTPS
-  # Accessible from both VPN and LAN - provides *.local domains
+  # Homelab mode: LAN-only access with Pi-hole DNS for *.local domains
   #
-  # Most services accessible via VPN AND LAN:
+  # All services accessible via LAN (Pi-hole DNS required):
   # - https://immich.local      → http://localhost:2283
   # - https://portainer.local   → http://localhost:9000
   # - https://forgejo.local     → http://localhost:3000 (Git)
@@ -18,9 +18,6 @@ in lib.mkIf selfSignedMode {
   # - https://memos.local       → http://localhost:5230
   # - https://links.local       → http://localhost:3500 (Linkwarden)
   # - https://ai.local          → http://localhost:8088 (Ollama)
-  # - https://argocd.local      → http://localhost:30443 (K3s GitOps - when enabled)
-  #
-  # VPN-ONLY services (explicit listen on VPN IP only):
   # - https://vault.local       → http://localhost:8222 (Vaultwarden)
   # - https://hashi-vault.local → http://localhost:8200 (HashiCorp Vault)
   # - https://monitoring.local  → http://localhost:3030 (Grafana)
@@ -43,7 +40,7 @@ in lib.mkIf selfSignedMode {
           -keyout /var/lib/nginx/ssl/local-domains.key \
           -out /var/lib/nginx/ssl/local-domains.crt \
           -subj "/CN=*.local" \
-          -addext "subjectAltName=DNS:*.local,DNS:immich.local,DNS:vault.local,DNS:hashi-vault.local,DNS:authelia.local,DNS:portainer.local,DNS:gitea.local,DNS:forgejo.local,DNS:jellyfin.local,DNS:n8n.local,DNS:memos.local,DNS:links.local,DNS:monitoring.local,DNS:ai.local,DNS:argocd.local"
+          -addext "subjectAltName=DNS:*.local,DNS:immich.local,DNS:vault.local,DNS:hashi-vault.local,DNS:authelia.local,DNS:portainer.local,DNS:gitea.local,DNS:forgejo.local,DNS:jellyfin.local,DNS:n8n.local,DNS:memos.local,DNS:links.local,DNS:monitoring.local,DNS:ai.local"
 
         chmod 644 /var/lib/nginx/ssl/local-domains.crt
         chmod 640 /var/lib/nginx/ssl/local-domains.key
@@ -96,8 +93,9 @@ in lib.mkIf selfSignedMode {
       }
     '';
 
-    # Listen on both VPN and LAN interfaces
-    defaultListenAddresses = [ vpnIp localIp ];
+    # Listen on LAN (always) and VPN (if enabled)
+    defaultListenAddresses = [ localIp ]
+      ++ lib.optionals wireguardEnabled [ vpnIp ];
 
     # Virtual hosts for each service
     virtualHosts = {
@@ -120,19 +118,13 @@ in lib.mkIf selfSignedMode {
         };
       };
 
-      # Vaultwarden - Password manager (VPN-ONLY for security)
+      # Vaultwarden - Password manager (now accessible on LAN - homelab mode)
       "vault.local" = {
         enableACME = false;
         forceSSL = true;
         sslCertificate = "/var/lib/nginx/ssl/local-domains.crt";
         sslCertificateKey = "/var/lib/nginx/ssl/local-domains.key";
         serverAliases = [ "vaultwarden.local" ];
-        # Only listen on VPN interface
-        listen = [{
-          addr = vpnIp;
-          port = 443;
-          ssl = true;
-        }];
         locations."/" = {
           proxyPass = "http://${localhost.ip}:8222";
           proxyWebsockets = true;
@@ -142,37 +134,18 @@ in lib.mkIf selfSignedMode {
         };
       };
 
-      # HashiCorp Vault UI - Secret management (VPN-only)
+      # HashiCorp Vault UI - Secret management (now accessible on LAN - homelab mode)
       "hashi-vault.local" = {
         enableACME = false;
         forceSSL = true;
         sslCertificate = "/var/lib/nginx/ssl/local-domains.crt";
         sslCertificateKey = "/var/lib/nginx/ssl/local-domains.key";
         serverAliases = [ "hashicorp-vault.local" ];
-        # Only listen on VPN interface
-        listen = [{
-          addr = vpnIp;
-          port = 443;
-          ssl = true;
-        }];
         locations."/" = {
           proxyPass = "http://${localhost.ip}:8200";
           proxyWebsockets = true;
         };
       };
-
-      # Authelia - SSO and OAuth provider (only needed for immich-friend OAuth)
-      # Commenting out - not needed for direct access to services
-      # "authelia.local" = {
-      #   enableACME = false;
-      #   forceSSL = true;
-      #   sslCertificate = "/var/lib/nginx/ssl/local-domains.crt";
-      #   sslCertificateKey = "/var/lib/nginx/ssl/local-domains.key";
-      #   locations."/" = {
-      #     proxyPass = "http://${localhost.ip}:9091";
-      #     proxyWebsockets = true;
-      #   };
-      # };
 
       # Portainer - Container management
       "portainer.local" = {
@@ -270,7 +243,7 @@ in lib.mkIf selfSignedMode {
         };
       };
 
-      # Grafana - Monitoring dashboards (VPN-ONLY via explicit listen block)
+      # Grafana - Monitoring dashboards (LAN access)
       "monitoring.local" = {
         enableACME = false;
         forceSSL = true;
@@ -299,25 +272,6 @@ in lib.mkIf selfSignedMode {
           '';
         };
       };
-
-      # ArgoCD - GitOps platform (only when K3s is enabled)
-      # Proxies to K3s NodePort service on localhost:30443
-      "argocd.local" = {
-        enableACME = false;
-        forceSSL = true;
-        sslCertificate = "/var/lib/nginx/ssl/local-domains.crt";
-        sslCertificateKey = "/var/lib/nginx/ssl/local-domains.key";
-        locations."/" = {
-          proxyPass = "http://${localhost.ip}:30443";
-          proxyWebsockets = true;
-          extraConfig = ''
-            # ArgoCD-specific settings
-            proxy_ssl_verify off;
-            # proxy_http_version already set by recommendedProxySettings
-          '';
-        };
-      };
-
     };
   };
 
@@ -328,15 +282,12 @@ in lib.mkIf selfSignedMode {
   };
 
   # Firewall configuration consolidated in modules/system/networking.nix
-  # Port 443 (HTTPS) opened for both LAN and VPN access
-
-  # SECURITY NOTE: vault.local is configured to ONLY listen on VPN IP (<VPN_IP>)
-  # So even though port 443 is open on LAN, Vaultwarden remains VPN-only
+  # Port 443 (HTTPS) opened for LAN access
 
   # CLIENT SETUP INSTRUCTIONS:
   #
   # 1. Configure DNS via Pi-hole (recommended) OR manually add to /etc/hosts:
-  #    <SERVER_IP>  immich.local vault.local hashi-vault.local portainer.local forgejo.local gitea.local jellyfin.local n8n.local memos.local links.local monitoring.local ai.local argocd.local
+  #    <SERVER_IP>  immich.local vault.local hashi-vault.local portainer.local forgejo.local gitea.local jellyfin.local n8n.local memos.local links.local monitoring.local ai.local
   #
   # 2. Trust the self-signed certificate:
   #    - Download: scp server:/var/lib/nginx/ssl/local-domains.crt ~/
@@ -345,10 +296,10 @@ in lib.mkIf selfSignedMode {
   #    - Windows: Import into "Trusted Root Certification Authorities"
   #    - Or just accept the browser warning each time
   #
-  # 3. Access services via HTTPS:
+  # 3. Access services via HTTPS from any device on your LAN:
   #    - https://immich.local (Photo management)
   #    - https://vault.local (Vaultwarden password manager - requires HTTPS for WebCrypto)
-  #    - https://hashi-vault.local (HashiCorp Vault - VPN only)
+  #    - https://hashi-vault.local (HashiCorp Vault)
   #    - https://portainer.local (Container management)
   #    - https://forgejo.local (Git)
   #    - https://gitea.local (Git - alternative)
@@ -356,13 +307,12 @@ in lib.mkIf selfSignedMode {
   #    - https://n8n.local (Workflow automation)
   #    - https://memos.local (Note-taking)
   #    - https://links.local (Linkwarden bookmark manager)
-  #    - https://monitoring.local (Grafana dashboards - VPN only)
+  #    - https://monitoring.local (Grafana dashboards)
   #    - https://ai.local (Ollama AI server)
-  #    - https://argocd.local (GitOps - when K3s enabled)
   #
   # SECURITY NOTES:
   # - HTTPS with self-signed certs for browser compatibility
-  # - Nginx listens on both VPN and LAN IPs (from global-config.nix)
-  # - VPN-only services (vault, hashi-vault, monitoring) use explicit listen blocks
-  # - No public internet exposure (behind private network)
+  # - Nginx listens on LAN IP (from global-config.nix)
+  # - All services accessible on LAN only (no public internet exposure)
+  # - Configure Pi-hole as router DNS for network-wide .local domain resolution
 }

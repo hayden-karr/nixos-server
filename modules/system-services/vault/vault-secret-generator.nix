@@ -96,17 +96,6 @@ in {
         echo -e "''${GREEN}✓ Generated: $display_name''${NC}"
       }
 
-      generate_immich_friend() {
-        echo -e "\n''${BLUE}═══ immich-friend (Rootless Photo Management) ═══''${NC}\n"
-
-        store_secret "immich-friend/oauth" "client_secret" "$(gen_random_base64)" "OAuth Client Secret"
-        store_secret "immich-friend/jwt" "secret" "$(gen_random_base64)" "JWT Secret"
-        store_secret "immich-friend/session" "secret" "$(gen_random_base64)" "Session Secret"
-        store_secret "immich-friend/storage" "key" "$(gen_random_hex)" "Storage Encryption Key"
-        store_secret "immich-friend/oidc-hmac" "secret" "$(gen_random_base64)" "OIDC HMAC Secret"
-        store_secret "immich-friend/database" "password" "$(gen_random_base64)" "PostgreSQL Password"
-      }
-
       generate_vaultwarden() {
         echo -e "\n''${BLUE}═══ vaultwarden (Password Manager) ═══''${NC}\n"
 
@@ -163,13 +152,12 @@ in {
       show_menu() {
         echo ""
         echo "Available containers:"
-        echo "  1) immich-friend      - Photo management (6 secrets)"
-        echo "  2) vaultwarden        - Password manager (1 secret)"
-        echo "  3) n8n                - Workflow automation (1 secret)"
-        echo "  4) pihole             - DNS server (1 secret)"
-        echo "  5) restic             - Backup server (htpasswd)"
-        echo "  6) linkwarden         - Bookmark manager (1 secret)"
-        echo "  7) samba              - Network file sharing (1 secret)"
+        echo "  1) vaultwarden        - Password manager (1 secret)"
+        echo "  2) n8n                - Workflow automation (1 secret)"
+        echo "  3) pihole             - DNS server (1 secret)"
+        echo "  4) restic             - Backup server (htpasswd)"
+        echo "  5) linkwarden         - Bookmark manager (1 secret)"
+        echo "  6) samba              - Network file sharing (1 secret)"
         echo "  a) All containers     - Generate all secrets"
         echo "  l) List secrets       - Show what's in Vault"
         echo "  q) Quit"
@@ -179,7 +167,7 @@ in {
       list_secrets() {
         echo -e "\n''${BLUE}═══ Secrets in Vault ═══''${NC}\n"
 
-        for container in immich-friend vaultwarden n8n pihole restic linkwarden samba; do
+        for container in vaultwarden n8n pihole restic linkwarden samba; do
           echo -e "''${CYAN}$container:''${NC}"
           vault_cmd kv list -mount=secret "$container/" 2>/dev/null | tail -n +3 | sed 's/^/  /' || echo -e "  ''${YELLOW}(no secrets)''${NC}"
         done
@@ -191,19 +179,17 @@ in {
           read -p "Select container: " choice
 
           case $choice in
-            1) generate_immich_friend ;;
-            2) generate_vaultwarden ;;
-            3) generate_n8n ;;
-            4) generate_pihole ;;
-            5) generate_restic ;;
-            6) generate_linkwarden ;;
-            7) generate_samba ;;
+            1) generate_vaultwarden ;;
+            2) generate_n8n ;;
+            3) generate_pihole ;;
+            4) generate_restic ;;
+            5) generate_linkwarden ;;
+            6) generate_samba ;;
             a|A)
               echo -e "\n''${YELLOW}⚠ This will generate secrets for ALL containers''${NC}"
               read -p "Continue? [y/N] " -n 1 -r
               echo
               if [[ $REPLY =~ ^[Yy]$ ]]; then
-                generate_immich_friend
                 generate_vaultwarden
                 generate_n8n
                 generate_pihole
@@ -225,7 +211,6 @@ in {
       else
         container=$1
         case $container in
-          immich-friend) generate_immich_friend ;;
           vaultwarden) generate_vaultwarden ;;
           n8n) generate_n8n ;;
           pihole) generate_pihole ;;
@@ -234,7 +219,7 @@ in {
           samba) generate_samba ;;
           *)
             echo -e "''${RED}ERROR: Unknown container: $container''${NC}"
-            echo "Available: immich-friend, vaultwarden, n8n, pihole, restic, linkwarden, samba"
+            echo "Available: vaultwarden, n8n, pihole, restic, linkwarden, samba"
             exit 1
             ;;
         esac

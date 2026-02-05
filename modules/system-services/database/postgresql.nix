@@ -44,7 +44,6 @@ in {
       host    all             all             ${localhost.ip}/32                     trust
       host    all             all             ${server.lanNetwork}                   scram-sha-256
       host    all             all             ${containers.immichNetwork}            scram-sha-256
-      host    all             all             ${containers.immichFriendNetwork}      scram-sha-256
       host    all             all             ${containers.dockerBridge}             scram-sha-256
       host    all             all             ${server.vpnNetwork}                   scram-sha-256
     '';
@@ -89,8 +88,8 @@ in {
       ${pkgs.postgresql_16}/bin/psql -c "ALTER USER ${meta.postgres.adminUser} WITH PASSWORD '$VAULT_PASS';" || true
 
       # Enable pgvector extension for Immich
-      ${pkgs.postgresql_16}/bin/psql -d immich -c "CREATE EXTENSION IF NOT EXISTS vector;" || true
-      ${pkgs.postgresql_16}/bin/psql -d immich -c "CREATE EXTENSION IF NOT EXISTS earthdistance CASCADE;" || true
+      ${pkgs.postgresql_16}/bin/psql -d immich_homelab -c "CREATE EXTENSION IF NOT EXISTS vector;" || true
+      ${pkgs.postgresql_16}/bin/psql -d immich_homelab -c "CREATE EXTENSION IF NOT EXISTS earthdistance CASCADE;" || true
 
       # Create owner roles for Vault dynamic user inheritance
       # Vault will grant these roles to dynamically-created users

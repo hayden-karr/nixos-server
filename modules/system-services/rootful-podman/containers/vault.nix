@@ -1,9 +1,7 @@
 { config, pkgs, ... }:
 
-let
-  inherit (config.serverConfig.network) localhost;
-in
-{
+let inherit (config.serverConfig.network) localhost;
+in {
   # HashiCorp Vault - Enterprise-grade secret management
   # Production-ready configuration without manual bootstrap
   #
@@ -37,10 +35,7 @@ in
     autoStart = true;
     cmd = [ "server" ]; # Explicitly run in server mode, not dev mode
 
-    ports = [
-      "8200:8200" # API/UI
-      "8201:8201" # Cluster port (for HA in future)
-    ];
+    ports = [ "${localhost.ip}:8200:8200" ];
 
     volumes = [
       "/mnt/ssd/vault/data:/vault/data"

@@ -1,14 +1,18 @@
-_:
+{ config, ... }:
 
 # Vaultwarden - Self-hosted Bitwarden-compatible password manager
 # Secrets managed by Vault Agent (see modules/vault-agents.nix)
 # Container configuration automatically integrates with metadata-driven Vault setup
 
-{
+let
+  inherit (config.serverConfig.network.server) localIp;
+  inherit (config.serverConfig.network) localhost;
+in {
   virtualisation.oci-containers.containers.vaultwarden = {
     image = "vaultwarden/server:latest";
     autoStart = true;
-    ports = [ "8222:8222" ];
+
+    ports = [ "${localhost.ip}:8222:8222" ];
 
     volumes = [
       "/mnt/ssd/vaultwarden/data:/data:U"
@@ -24,8 +28,9 @@ _:
       # Admin token from Vault
       ADMIN_TOKEN_FILE = "/run/secrets/admin-token";
 
-      # Domain and network
-      DOMAIN = "https://vault.local";
+      # Domain and network - Homelab mode (HTTPS via nginx on original port)
+      # USE THE https://vault.local if you have the nginx rather than the nginx-ip-ports to use pi-hole dns
+      DOMAIN = "https://${localIp}:8222";
       ROCKET_ADDRESS = "0.0.0.0";
       ROCKET_PORT = "8222";
 

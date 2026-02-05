@@ -72,11 +72,6 @@ in {
           default = globalConfig.network.containers.immichNetwork;
           description = "Immich container network CIDR";
         };
-        immichFriendNetwork = lib.mkOption {
-          type = lib.types.str;
-          default = globalConfig.network.containers.immichFriendNetwork;
-          description = "Immich-friend container network CIDR";
-        };
         dockerBridge = lib.mkOption {
           type = lib.types.str;
           default = globalConfig.network.containers.dockerBridge;
@@ -96,154 +91,34 @@ in {
           description = "Localhost network CIDR (127.0.0.0/8)";
         };
       };
+
+      wireguard = {
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = globalConfig.network.wireguard.enable or false;
+          description = ''
+            Enable WireGuard VPN for remote access.
+            When enabled, all nginx services become accessible via VPN.
+            Requires domain-vpn secret in secrets.yaml.
+          '';
+        };
+      };
     };
 
-    # Ingress configuration
-    ingress = {
-      certMode = lib.mkOption {
-        type = lib.types.enum [ "self-signed" "letsencrypt" ];
-        default = globalConfig.ingress.certMode;
+    # Nginx configuration
+    nginx = {
+      mode = lib.mkOption {
+        type = lib.types.enum [ "domain-names" "ip-ports" ];
+        default = globalConfig.nginx.mode;
         description = ''
-          Certificate mode for nginx:
-          - "self-signed": Self-signed certs for *.local domains (no external dependencies, browser warnings)
-          - "letsencrypt": Let's Encrypt with real domain (requires Cloudflare DNS, trusted certs)
+          Nginx reverse proxy mode:
+          - "domain-names": Uses friendly .local domains (e.g., immich.local) on port 443
+            Requires Pi-hole DNS or manual /etc/hosts entries
+            All services accessible via https://*.local
+          - "ip-ports": Uses server IP with different ports (e.g., 192.168.1.100:2283)
+            No DNS configuration needed
+            Each service on different HTTPS port
         '';
-      };
-
-      baseDomain = lib.mkOption {
-        type = lib.types.str;
-        default = globalConfig.ingress.baseDomain;
-        description =
-          "Base domain for Let's Encrypt certificates (only used when certMode = letsencrypt)";
-      };
-    };
-
-    # Mail configuration
-    mail = {
-      from = lib.mkOption {
-        type = lib.types.str;
-        default = globalConfig.mail.from;
-        description = "From address for system emails";
-      };
-    };
-
-    # SMTP configuration (Resend)
-    smtp = {
-      host = lib.mkOption {
-        type = lib.types.str;
-        default = "smtp.resend.com";
-        description = "SMTP server hostname";
-      };
-      port = lib.mkOption {
-        type = lib.types.port;
-        default = 587;
-        description = "SMTP server port (STARTTLS)";
-      };
-      username = lib.mkOption {
-        type = lib.types.str;
-        default = "resend";
-        description = "SMTP authentication username";
-      };
-      from = lib.mkOption {
-        type = lib.types.str;
-        default = globalConfig.mail.from;
-        description = "SMTP from address (same as mail.from)";
-      };
-    };
-
-    # Monitoring alert configuration
-    monitoring = {
-      alerts = {
-        discord = lib.mkOption {
-          type = lib.types.bool;
-          default = globalConfig.monitoring.alerts.discord;
-          description = "Enable Discord alerts";
-        };
-        email = lib.mkOption {
-          type = lib.types.bool;
-          default = globalConfig.monitoring.alerts.email;
-          description = "Enable email alerts via SMTP";
-        };
-      };
-    };
-
-    # Container backend configuration
-    container-backend = {
-      backend = lib.mkOption {
-        type = lib.types.enum [ "podman" "k3s" ];
-        default = globalConfig.container-backend.backend;
-        description = "Container backend to use";
-      };
-
-      k3s = {
-        storageMode = lib.mkOption {
-          type = lib.types.enum [ "hostPath" "pvc" ];
-          default = globalConfig.container-backend.k3s.storageMode;
-          description = "K3s storage mode";
-        };
-        storageClassName = lib.mkOption {
-          type = lib.types.str;
-          default = globalConfig.container-backend.k3s.storageClassName;
-          description = "K3s storage class name";
-        };
-        exposeLAN = lib.mkOption {
-          type = lib.types.bool;
-          default = globalConfig.container-backend.k3s.exposeLAN;
-          description = "Whether to expose k3s services on LAN";
-        };
-
-        gitops = {
-          enable = lib.mkOption {
-            type = lib.types.bool;
-            default = globalConfig.container-backend.k3s.gitops.enable;
-            description = "Enable ArgoCD GitOps";
-          };
-          gitProvider = lib.mkOption {
-            type = lib.types.enum [ "gitea" "github" ];
-            default = globalConfig.container-backend.k3s.gitops.gitProvider;
-            description = "Git provider for GitOps";
-          };
-          sshKeyPath = lib.mkOption {
-            type = lib.types.str;
-            default = globalConfig.container-backend.k3s.gitops.sshKeyPath;
-            description = "SSH key path for Git authentication";
-          };
-
-          gitea = {
-            repoURL = lib.mkOption {
-              type = lib.types.str;
-              default = globalConfig.container-backend.k3s.gitops.gitea.repoURL;
-              description = "Gitea repository URL";
-            };
-            internalURL = lib.mkOption {
-              type = lib.types.str;
-              default =
-                globalConfig.container-backend.k3s.gitops.gitea.internalURL;
-              description = "Gitea internal URL for k3s";
-            };
-            targetRevision = lib.mkOption {
-              type = lib.types.str;
-              default =
-                globalConfig.container-backend.k3s.gitops.gitea.targetRevision;
-              description = "Git branch to track";
-            };
-          };
-
-          github = {
-            repoURL = lib.mkOption {
-              type = lib.types.str;
-              default =
-                globalConfig.container-backend.k3s.gitops.github.repoURL;
-              description = "GitHub repository URL";
-            };
-            targetRevision = lib.mkOption {
-              type = lib.types.str;
-              default =
-                globalConfig.container-backend.k3s.gitops.github.targetRevision;
-              description = "Git branch to track";
-            };
-          };
-        };
       };
     };
   };

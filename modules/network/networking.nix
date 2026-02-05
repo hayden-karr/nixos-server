@@ -1,7 +1,8 @@
 { config, ... }:
 
 let
-  inherit (config.serverConfig.network) localhost server;
+  inherit (config.serverConfig.network.server) lanNetwork;
+  localhostNetwork = config.serverConfig.network.localhost.network;
 in {
   # Access level guide - Where to expose your services:
   #
@@ -121,9 +122,9 @@ in {
     enable = true;
     maxretry = 3;
     ignoreIP = [
-      localhost.network # Localhost
-      server.vpnNetwork # WireGuard VPN clients
-      server.lanNetwork # Your local network - can't ban yourself
+      localhostNetwork # Localhost
+      # vpnNetwork # WireGuard VPN clients
+      lanNetwork # Your local network - can't ban yourself
     ];
 
     # Custom jails for enhanced protection
@@ -181,33 +182,6 @@ in {
           bantime = -1; # Permanent ban
         };
       };
-
-      # Authelia Friend (Podman) - Authentication brute force protection
-      authelia-friend-podman = {
-        settings = {
-          enabled = true;
-          port = "http,https";
-          filter = "authelia-friend";
-          logpath = "/mnt/ssd/immich_friend/authelia/authelia.log";
-          maxretry = 5; # Allow some legitimate failures
-          findtime = 600; # 10 minutes
-          bantime = 10800; # 3 hours
-        };
-      };
-
-      # Authelia Friend (K3s) - Authentication brute force protection
-      # Note: Logs may be in different location when using k3s
-      authelia-friend-k3s = {
-        settings = {
-          enabled = true;
-          port = "http,https";
-          filter = "authelia-friend";
-          logpath = "/var/log/containers/authelia-*.log";
-          maxretry = 5;
-          findtime = 600; # 10 minutes
-          bantime = 10800; # 3 hours
-        };
-      };
     };
   };
 
@@ -240,22 +214,6 @@ in {
                   ^.*java\.rmi\..*<HOST>
 
       ignoreregex =
-    '';
-
-    # Authelia filter - detects failed authentication attempts
-    "fail2ban/filter.d/authelia-friend.conf".text = ''
-      [Definition]
-      # Authelia log format: time="..." level=error msg="..." method=POST path=/api/firstfactor remote_ip=X.X.X.X
-
-      # Match failed 1FA (username/password) attempts
-      failregex = ^.*level=error.*Unsuccessful 1FA authentication attempt.*remote_ip="?<HOST>"?.*$
-                  ^.*level=error.*Authentication attempt failed.*remote_ip="?<HOST>"?.*$
-                  ^.*level=error.*Invalid credentials.*remote_ip="?<HOST>"?.*$
-                  ^.*level=error.*failed authentication attempt.*remote_ip=<HOST>.*$
-
-      # Ignore successful authentications
-      ignoreregex = ^.*level=info.*Successful.*$
-                    ^.*level=debug.*$
     '';
   };
 }

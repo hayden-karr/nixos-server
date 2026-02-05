@@ -3,7 +3,8 @@
     # Networking
     ./networking.nix
 
-    # VPN
+    # WireGuard VPN (conditionally enabled)
+    # Toggle in config.nix: network.wireguard.enable = true/false
     ./wireguard.nix
     ./wireguard-peer-gen.nix
   ];

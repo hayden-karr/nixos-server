@@ -9,11 +9,13 @@ let
     inherit (config) serverConfig;
   };
   inherit (config.serverConfig.network.server) localIp;
+  inherit (config.serverConfig.network) localhost;
 in {
   virtualisation.oci-containers.containers.n8n = {
     image = "n8nio/n8n:latest";
     autoStart = true;
-    ports = [ "5678:5678" ];
+
+    ports = [ "${localhost.ip}:5678:5678" ];
 
     volumes = [
       "/mnt/ssd/n8n/data:/home/node/.n8n:U"
@@ -25,13 +27,15 @@ in {
       N8N_HOST = "0.0.0.0";
       N8N_PORT = "5678";
       N8N_PROTOCOL = "https";
-      WEBHOOK_URL = "https://n8n.local";
+      # USE THE https://n8n.local if you have the nginx rather than the nginx-ip-ports to use pi-hole dns
+      WEBHOOK_URL =
+        "https://${localIp}:5678"; # Homelab mode (HTTPS via nginx on original port)
 
       # Database connection - credentials from Vault
       DB_TYPE = "postgresdb";
       DB_POSTGRESDB_HOST = localIp;
       DB_POSTGRESDB_PORT = "5432";
-      DB_POSTGRESDB_DATABASE = "n8n";
+      DB_POSTGRESDB_DATABASE = "n8n_homelab";
       DB_POSTGRESDB_USER_FILE = "/run/secrets/db_username";
       DB_POSTGRESDB_PASSWORD_FILE = "/run/secrets/db_password";
       N8N_ENCRYPTION_KEY_FILE = "/run/secrets/encryption_key";

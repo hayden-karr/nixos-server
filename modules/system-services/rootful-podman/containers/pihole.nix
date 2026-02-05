@@ -3,7 +3,7 @@
 # Pi-hole - DNS server for .local domain resolution
 # Secrets managed by Vault Agent (see modules/vault-agents.nix)
 
-let inherit (config.serverConfig.network.server) vpnIp localIp;
+let inherit (config.serverConfig.network.server) localIp;
 in {
   virtualisation.oci-containers.containers.pihole = {
     image = "pihole/pihole:latest";
@@ -53,27 +53,21 @@ in {
       # Disable FTL database (we only care about DNS)
       PIHOLE_FTL_CONF_REPLY_WHEN_BUSY = "DROP";
 
-      # Allow queries from any source (since we're already firewalled by VPN)
+      # Allow DNS queries from any device on the network (not just localhost)
+      # This is required for Pi-hole to work as a network-wide DNS server
       FTLCONF_dns_listeningMode = "all";
 
       # Custom DNS records using official Pi-hole v6 FTL environment variable
       # Format: semicolon-delimited string "IP HOSTNAME;IP HOSTNAME;..."
-      # Most services point to LAN IP for both LAN and VPN access
-      # vault.local = Vaultwarden (password manager, VPN-only)
-      # hashicorp-vault.local = HashiCorp Vault UI (secret management, LAN access)
+      # All services point to LAN IP (${localIp}) for homelab access
       FTLCONF_dns_hosts =
-        "${localIp} immich.local;${vpnIp} hashi-vault.local; ${vpnIp} vault.local;${localIp} portainer.local; ${localIp} gitea.local; ${localIp} forgejo.local; ${localIp} jellyfin.local; ${localIp} n8n.local; ${localIp} memos.local; ${localIp} links.local; ${vpnIp} monitoring.local;${localIp} ai.local;${localIp} argocd.local";
+        "${localIp} immich.local;${localIp} hashi-vault.local; ${localIp} vault.local;${localIp} portainer.local; ${localIp} gitea.local; ${localIp} forgejo.local; ${localIp} jellyfin.local; ${localIp} n8n.local; ${localIp} memos.local; ${localIp} links.local; ${localIp} monitoring.local;${localIp} ai.local";
     };
 
     # Load environment variables from Vault secret (contains WEBPASSWORD)
     environmentFiles = [ "/run/secrets/pihole/pihole-env" ];
 
     ports = [
-      # VPN interface
-      "${vpnIp}:53:53/tcp"
-      "${vpnIp}:53:53/udp"
-      "${vpnIp}:8080:80/tcp"
-
       # LAN interface for whole-network ad blocking
       "${localIp}:53:53/tcp"
       "${localIp}:53:53/udp"
@@ -131,25 +125,24 @@ in {
   # 2. Deploy:
   #    sudo nixos-rebuild switch
   #
-  # 3. Configure WireGuard clients to use Pi-hole DNS:
-  #    Edit your WireGuard config and set:
-  #    DNS = 10.0.0.1
-  #
-  #    Then reconnect to VPN.
+  # 3. Configure your router to use Pi-hole as DNS:
+  #    - Access your router's admin panel
+  #    - Set primary DNS to <SERVER_IP> (Pi-hole)
+  #    - Set secondary DNS to 9.9.9.9 (Quad9 fallback)
+  #    - This makes .local domains work for all devices on your network
   #
   # 4. Access admin panel:
-  #    http://10.0.0.1:8080/admin
+  #    http://<SERVER_IP>:8080/admin
   #    Password: <what you set in secrets.yaml>
   #
-  # 5. Test DNS resolution on your phone/laptop:
-  #    nslookup gitea.local
-  #    Should return 10.0.0.1
+  # 5. Test DNS resolution from any device on your LAN:
+  #    nslookup forgejo.local
+  #    Should return <SERVER_IP>
   #
-  #    Now you can access:
-  #    - http://gitea.local
-  #    - http://immich.local
-  #    - http://vault.local
+  #    Now you can access services via .local domains:
+  #    - https://forgejo.local
+  #    - https://immich.local
+  #    - https://vault.local
   #    - etc.
   #
-  # After setup, all .local domains will work on any device connected to VPN!
 }

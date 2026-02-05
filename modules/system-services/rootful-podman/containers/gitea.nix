@@ -9,12 +9,13 @@ let
     inherit (config) serverConfig;
   };
   inherit (config.serverConfig.network.server) localIp;
+  inherit (config.serverConfig.network) localhost;
 
 in {
   virtualisation.oci-containers.containers.gitea = {
     image = "gitea/gitea:latest";
     autoStart = true;
-    ports = [ "3000:3000" ];
+    ports = [ "${localhost.ip}:3000:3000" ];
 
     volumes = [
       "/mnt/ssd/gitea:/config:U"
@@ -46,7 +47,7 @@ in {
       USER_GID = "1000";
       GITEA__database__DB_TYPE = "postgres";
       GITEA__database__HOST = "${localIp}:5432";
-      GITEA__database__NAME = "gitea";
+      GITEA__database__NAME = "gitea_homelab";
       GITEA__database__USER__FILE = "/run/secrets/db_username";
       GITEA__database__PASSWD__FILE = "/run/secrets/db_password";
       GITEA__server__DOMAIN = "gitea.local";

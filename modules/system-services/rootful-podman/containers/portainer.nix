@@ -1,4 +1,7 @@
-_: {
+{ config, ... }:
+
+let inherit (config.serverConfig.network) localhost;
+in {
   # Portainer - Container management UI
   # VPN-only access for admin
   # Access: http://10.0.0.1:9000 (via WireGuard)
@@ -7,8 +10,7 @@ _: {
     image = "portainer/portainer-ce:latest";
     autoStart = true;
 
-    # Port mapping for better isolation
-    ports = [ "9000:9000" "9443:9443" ];
+    ports = [ "${localhost.ip}:9000:9000" "${localhost.ip}:9443:9443" ];
 
     volumes = [
       # Portainer data persistence

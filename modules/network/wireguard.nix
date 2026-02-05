@@ -1,16 +1,22 @@
-{ config, ... }:
+{ config, lib, ... }:
 let
   inherit (config.serverConfig.network.server) vpnIpWithCidr;
+  wireguardEnabled = config.serverConfig.network.wireguard.enable;
   wireguard-priv-key = config.sops.secrets.wireguard-private-key.path;
 in {
-  # Decrypt WireGuard private key from sops
-  sops.secrets.wireguard-private-key = {
+  # Decrypt WireGuard secrets from sops
+  sops.secrets.wireguard-private-key = lib.mkIf wireguardEnabled {
     owner = "root";
     group = "root";
     mode = "0400";
   };
 
-  networking.wireguard.interfaces.wg0 = {
+  sops.secrets.domain-vpn = lib.mkIf wireguardEnabled {
+    owner = "root";
+    mode = "0400";
+  };
+
+  networking.wireguard.interfaces.wg0 = lib.mkIf wireguardEnabled {
     ips = [ vpnIpWithCidr ];
     listenPort = 51820;
     privateKeyFile = wireguard-priv-key;

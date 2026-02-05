@@ -1,8 +1,10 @@
-{ pkgs, config, ... }:
+{ pkgs, config, lib, ... }:
 
-let inherit (config.serverConfig.network.server) vpnNetwork vpnIp;
+let
+  inherit (config.serverConfig.network.server) vpnNetwork vpnIp;
+  wireguardEnabled = config.serverConfig.network.wireguard.enable;
 in {
-  environment.systemPackages = [
+  environment.systemPackages = lib.optionals wireguardEnabled [
     (pkgs.writeShellScriptBin "wg-add-peer" ''
       #!/usr/bin/env bash
       set -euo pipefail

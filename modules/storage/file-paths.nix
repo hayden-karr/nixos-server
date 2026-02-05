@@ -14,9 +14,6 @@ _: {
     # SYSTEM DIRECTORIES
     # =========================================================================
 
-    # System logs
-    "f /var/log/msmtp.log 0644 root root -"
-
     # WireGuard
     "d /var/lib/wireguard 0700 root root -"
     "d /var/lib/wireguard/peer-configs 0700 root root -"
@@ -107,28 +104,11 @@ _: {
     "d /mnt/ssd/jellyfin/config 0750 root root -"
     "d /mnt/ssd/jellyfin/cache 0750 root root -"
 
-    # Immich Friend - rootless containers owned by immich-friend user (UID 1001)
-    "d /mnt/ssd/immich_friend 0755 immich-friend immich-friend -"
-    "d /mnt/ssd/immich_friend/thumbs 0755 immich-friend immich-friend -"
-    "d /mnt/ssd/immich_friend/profile 0755 immich-friend immich-friend -"
-    "d /mnt/ssd/immich_friend/upload 0755 immich-friend immich-friend -"
-    "d /mnt/ssd/immich_friend/postgres 0750 immich-friend immich-friend -"
-    "d /mnt/ssd/immich_friend/authelia 0770 immich-friend immich-friend -"
-    "f /mnt/ssd/immich_friend/thumbs/.immich 0644 immich-friend immich-friend -"
-    "f /mnt/ssd/immich_friend/profile/.immich 0644 immich-friend immich-friend -"
-    "f /mnt/ssd/immich_friend/upload/.immich 0644 immich-friend immich-friend -"
-    "f /mnt/ssd/immich_friend/authelia/notification.txt 0666 immich-friend immich-friend -"
-    "f /mnt/ssd/immich_friend/authelia/db.sqlite3 0666 immich-friend immich-friend -"
-
-    # Authelia
-    "d /mnt/ssd/authelia 0750 root root -"
-    "d /mnt/ssd/authelia/data 0750 root root -"
-
-    # WireGuard
+    # WireGuard (optional - enabled in main branch)
     "d /var/lib/wireguard 0700 root root -"
     "d /var/lib/wireguard/peer-configs 0700 root root -"
 
-    # Nginx SSL
+    # Nginx SSL certificates
     "d /var/lib/nginx/ssl 0755 root root -"
 
     # Static web pages
@@ -136,9 +116,6 @@ _: {
 
     # SnapRAID metadata
     "d /var/snapraid 0755 root root -"
-
-    # SSD snapshots directory
-    "d /mnt/ssd/.snapshots 0755 root root -"
 
     # linkwarden
     "d /mnt/ssd/linkwarden 0755 root root -"
@@ -181,15 +158,6 @@ _: {
     "f /mnt/storage/immich/originals/.immich 0644 root root -"
     "f /mnt/storage/immich/encoded-video/.immich 0644 root root -"
     "f /mnt/storage/immich/backups/.immich 0644 root root -"
-
-    # Immich Friend originals (rootless - owned by immich-friend user)
-    "d /mnt/storage/immich_friend 0755 immich-friend immich-friend -"
-    "d /mnt/storage/immich_friend/originals 0755 immich-friend immich-friend -"
-    "d /mnt/storage/immich_friend/encoded-video 0755 immich-friend immich-friend -"
-    "d /mnt/storage/immich_friend/backups 0755 immich-friend immich-friend -"
-    "f /mnt/storage/immich_friend/originals/.immich 0644 immich-friend immich-friend -"
-    "f /mnt/storage/immich_friend/encoded-video/.immich 0644 immich-friend immich-friend -"
-    "f /mnt/storage/immich_friend/backups/.immich 0644 immich-friend immich-friend -"
 
     # Jellyfin media library
     "d /mnt/storage/jellyfin 0750 root root -"

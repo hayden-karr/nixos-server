@@ -10,12 +10,12 @@ let
     inherit (config) serverConfig;
   };
   inherit (config.serverConfig.network.server) localIp;
-
+  inherit (config.serverConfig.network) localhost;
 in {
   virtualisation.oci-containers.containers.forgejo = {
     image = "codeberg.org/forgejo/forgejo:9";
     autoStart = true;
-    ports = [ "3000:3000" ];
+    ports = [ "${localhost.ip}:3000:3000" ];
 
     volumes = [
       "/mnt/ssd/forgejo:/config:U"
@@ -48,11 +48,12 @@ in {
       # Forgejo uses Gitea-compatible environment variables
       GITEA__database__DB_TYPE = "postgres";
       GITEA__database__HOST = "${localIp}:5432";
-      GITEA__database__NAME = "forgejo";
+      GITEA__database__NAME = "forgejo_homelab";
       GITEA__database__USER__FILE = "/run/secrets/db_username";
       GITEA__database__PASSWD__FILE = "/run/secrets/db_password";
-      GITEA__server__DOMAIN = localIp;
-      GITEA__server__ROOT_URL = "http://${localIp}:3000/";
+      GITEA__server__DOMAIN = "${localIp}";
+      GITEA__server__ROOT_URL =
+        "https://${localIp}:3000/"; # Homelab mode (HTTPS via nginx on original port)
       GITEA__server__HTTP_PORT = "3000";
       # SSH Configuration - Completely disabled
       GITEA__server__DISABLE_SSH = "true";

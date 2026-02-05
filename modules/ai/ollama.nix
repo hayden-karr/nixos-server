@@ -1,6 +1,7 @@
-_:
+{ config, ... }:
 
-{
+let inherit (config.serverConfig.network) localhost;
+in {
   # Ollama - Local AI/LLM Server with CUDA acceleration
   # Run large language models locally (Llama, Mistral, etc.)
   #
@@ -30,7 +31,7 @@ _:
     image = "ghcr.io/open-webui/open-webui:main";
     autoStart = true;
 
-    ports = [ "8088:8088" ];
+    ports = [ "${localhost.ip}:8088:8088" ];
 
     volumes = [ "/mnt/ssd/ollama/open-webui:/app/backend/data" ];
 

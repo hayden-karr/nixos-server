@@ -1,8 +1,0 @@
-# Vault Namespace - Dedicated namespace for Vault secrets management
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: vault
-  labels:
-    name: vault
-    purpose: secrets-management
