@@ -85,7 +85,6 @@ in {
   #
   # 3. Add memos.local DNS record to Pi-hole:
   #    Edit modules/containers/pihole.nix line 66:
-  #    FTLCONF_dns_hosts = "...;192.168.4.105 memos.local";
   #
   # 4. Add nginx reverse proxy for memos.local:
   #

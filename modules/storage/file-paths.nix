@@ -21,7 +21,7 @@ _: {
     "d /var/lib/wireguard 0700 root root -"
     "d /var/lib/wireguard/peer-configs 0700 root root -"
 
-    # Nginx SSL
+    # Nginx SSL certificates
     "d /var/lib/nginx/ssl 0755 root root -"
 
     # Static web pages

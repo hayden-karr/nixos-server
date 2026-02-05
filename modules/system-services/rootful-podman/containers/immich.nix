@@ -354,9 +354,8 @@ in {
 
         serviceConfig = {
           RestartSec = "5s";
-          ExecStartPre = [
-            "${vaultExtractDbCreds}/bin/vault-extract-db-creds immich /run/secrets/immich"
-          ];
+          ExecStartPre =
+            "${vaultExtractDbCreds}/bin/vault-extract-db-creds immich /run/secrets/immich";
         };
       };
     };
